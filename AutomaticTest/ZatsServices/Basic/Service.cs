@@ -2310,6 +2310,11 @@ namespace Zats.Services
             var res = device.GetMaxLrTxPower();
             return new BasicResult.GetMaxLrTxPower(res);
         }
+
+        public Device GetDevice(Alias deviceNumber)
+        {
+            return DeviceManager.GetDevice(deviceNumber);
+        }
     }
 }
 
