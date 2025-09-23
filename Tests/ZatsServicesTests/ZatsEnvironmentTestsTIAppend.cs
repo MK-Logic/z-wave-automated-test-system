@@ -54,7 +54,7 @@ namespace ZatsServicesTests
             testCaseDefinition.SshDevices = new SortedList<Alias, SshDeviceMappingAttribute>();
             testCaseDefinition.DeviceGroups = new SortedList<Alias, MultiDeviceMappingAttribute>();
 
-            var consoleOutPut = new ConsoleCustomOutput(false, false);
+            var consoleOutPut = new ConsoleCustomOutput(false, false, false);
             Profile profile = new Profile();
             profile.DeviceHosts = new ObservableCollection<DeviceHost>();
             foreach (var item in actualVersions.Select(x => x.Value.Item2))
@@ -62,7 +62,7 @@ namespace ZatsServicesTests
                 profile.DeviceHosts.Add(item);
             }
 
-            var actualSetupResult = zatsEnvironment.SetUp(profile, testCaseDefinition, cmdLineSettings, zatsSettings, consoleOutPut, frequency, 1, 1);
+            var actualSetupResult = zatsEnvironment.SetUp(profile, testCaseDefinition, cmdLineSettings, zatsSettings, consoleOutPut, frequency, LongRangeChannels.Undefined, 1, 1);
             GC.Collect();
             return actualSetupResult;
         }
@@ -147,7 +147,7 @@ namespace ZatsServicesTests
                     .Callback((IActionItem a) =>
                     {
                         var act = actualVersions[((ActionBase)a).Token.LogEntryPointSource];
-                        if (!DeviceManager.IsSampleApplication(act.Item1))
+                        if (!act.Item1.IsSampleApplication())
                         {
                             ((SerialApiGetInitDataOperation)a).SpecificResult.ChipType = !string.IsNullOrEmpty(act.Item2.JName) ? ChipTypes.ZW070x : ChipTypes.ZW050x;
                             ((ActionBase)a).Token.SetCompleted();
@@ -169,7 +169,7 @@ namespace ZatsServicesTests
                        {
                            lib = updated[((ActionBase)a).Token.LogEntryPointSource];
                        }
-                       if (!DeviceManager.IsSampleApplication(lib))
+                       if (!lib.IsSampleApplication())
                        {
                            ((VersionOperation)a).SpecificResult.Library = lib;
                            ((VersionOperation)a).SpecificResult.Version = string.IsNullOrEmpty(act.Item2.JName) ? Five : Seven;
@@ -194,7 +194,7 @@ namespace ZatsServicesTests
                         }
                         if (((RequestOperation)a).Data.SequenceEqual("00 15".GetBytes()))
                         {
-                            if (!DeviceManager.IsSampleApplication(lib))
+                            if (!lib.IsSampleApplication())
                             {
                                 ((RequestOperation)a).SpecificResult.Payload = GetVersion(string.IsNullOrEmpty(act.Item2.JName) ? Five : Seven)
                                 .Concat(new[] { (byte)lib })
