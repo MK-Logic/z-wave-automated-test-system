@@ -11,7 +11,7 @@ namespace Zats.Services
     public class MultilevelSensorType : INestedItem, INodeItem
     {
         private static string sensorTypesJsonFile { get; } = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, 
-            Path.Combine("CommandClassesImpl\\Definitions", "MultilevelSensorTypes.json"));
+            Path.Combine("CommandClassesImpl", "Definitions", "MultilevelSensorTypes.json"));
 
         public string Name { get; set; }
         public int NestedId { get; set; }
