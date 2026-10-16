@@ -83,6 +83,10 @@ namespace Zats.Services
             // only schedules that handler to run later, which raced behind
             // such a follow-up box and confused SolidRemoteStation.
             //
+            // Keep »SKIP:DISABLE« as the established skip wire protocol so older
+            // CTT/SolidRemoteStation clients still dismiss skip prompts. CloseMessageBox()
+            // is only for newly introduced prompts such as Wait-for-DUT.
+            //
             // Warning: Changing the following string without adapting the LogDataReceived function in CTT class ZatsTestWorker
             // breaks the confirmation buttons in CTT!
             WriteLine("»SKIP:DISABLE«");
@@ -93,6 +97,13 @@ namespace Zats.Services
             // Warning: Changing the following string without adapting the LogDataReceived function in CTT class ZatsTestWorker
             // breaks the output within the CTT!
             WriteTitle($"{message}»WAIT_DUT:SHOW«");
+        }
+
+        public void CloseMessageBox()
+        {
+            // Warning: Changing the following string without adapting the LogDataReceived function in CTT class ZatsTestWorker
+            // breaks closing confirmation UI / remote popups in CTT!
+            WriteLine("»MESSAGEBOX:CLOSE«");
         }
 
         public DialogResult Show(string message, string title, MessageBoxButtons messageBoxButtons, MessageBoxIcon messageBoxIcon = MessageBoxIcon.Asterisk)
