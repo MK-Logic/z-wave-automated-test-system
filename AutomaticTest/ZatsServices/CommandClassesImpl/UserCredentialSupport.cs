@@ -3753,12 +3753,14 @@ namespace Zats.Services
         HandBiometric = 0x0A,
         [Description("0x0B Unspecified Biometric")]
         UnspecBiometric = 0x0B,
-        [Description("0x0C DESFire EV2/3")]
+        [Description("0x0C LEAF-Compliant MIFARE RFID")]
         [HideFromUI(true)]
-        // This credential type requires implementation of the cryptographic algorithms defined by DESFire, as well as the KeyLocker functionality and an additional nested control.
+        // This credential type requires implementation of the cryptographic algorithms defined by LEAF-Compliant MIFARE RFID,
+        // as well as the KeyLocker functionality and an additional nested control.
         // Full support for this credential type is outside the scope of the current Support Implementation and is not intended for use with the EDE.
-        // However, for (CCR) test case creation, DESFire and KeyLocker can be addressed using Zats Tests. Note that applying this credential type will not function as expected in the current implementation.
-        DESFire = 0x0C
+        // However, for (CCR) test case creation, LEAF-Compliant MIFARE RFID and KeyLocker can be addressed using Zats Tests.
+        // Note that applying this credential type will not function as expected in the current implementation.
+        LeafCompliantMifareRfid = 0x0C
     }
 
     public enum CredentialSetOperationType
@@ -3834,7 +3836,7 @@ namespace Zats.Services
 
     public enum KeyLockerEntryType
     {
-        DESFire = 0x01
+        LeafCompliantMifareRfidConfiguration = 0x01
     }
 
     public enum KeyLockerEntrySetOperationType
