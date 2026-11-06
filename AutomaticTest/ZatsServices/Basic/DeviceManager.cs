@@ -1899,6 +1899,37 @@ namespace Zats.Services
                 client.GetMaxPayloadSize();
                 client.GetMaxLRPayloadSize();
             }
+            ListenForSerialApiStarted(item, client);
+        }
+
+        /// <summary>
+        /// Listens for the Serial API Started callback of the device and restores what a restart of the Serial API undoes: The 16-bit
+        /// NodeId base type, and for an End Device Serial API the NodeId and keys of the own node and the NIF inclusion state they
+        /// select. Cancels the listener of a previous client of the same host first.
+        /// </summary>
+        private void ListenForSerialApiStarted(DeviceHostClient item, Device client)
+        {
+            if (item.SerialApiStartedToken != null)
+            {
+                client.Cancel(item.SerialApiStartedToken);
+            }
+            item.SerialApiStartedToken = client.Listen(new ByteIndex[] { 0x00, 0x0A }, data =>
+            {
+                // The callback arrives on the session thread, and the restoring commands wait for their responses.
+                Task.Run(() =>
+                {
+                    Log($"Serial API started at {item.DeviceAlias}, restoring the NodeId base type and the own node", LogLevels.Diagnostic);
+                    if (!IsOptionDisabled(ZWaveSet.NodeIdBase2, item.DeviceAlias))
+                    {
+                        client.SerialApiSetNodeIdBaseType(2);
+                    }
+                    if (client.Library.IsSerialApiEndDevice())
+                    {
+                        client.MemoryGetId();
+                        SetNodeInformationByKeys(client);
+                    }
+                });
+            });
         }
 
         private List<Tuple<UnknownDevice, DeviceHost, int>> GetCompatibilityByChipSeriesTable(IEnumerable<UnknownDevice> requiredList, IEnumerable<DeviceHost> availableList)
@@ -2647,6 +2678,10 @@ namespace Zats.Services
         public IApplicationClient ZClient { get; set; }
         public DevKits DevKit { get; set; }
         public ConfigurationItem ConfigurationItem { get; set; }
+        /// <summary>
+        /// The listener for the Serial API Started callback of the Serial API device, null before the device is set up.
+        /// </summary>
+        public ActionToken SerialApiStartedToken { get; set; }
         public DeviceHostClient(DeviceHost deviceHost)
             : this(deviceHost, null, null)
         {
