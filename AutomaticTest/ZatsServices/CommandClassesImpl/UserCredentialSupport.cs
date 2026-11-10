@@ -28,6 +28,7 @@ namespace Zats.Services
     public class UserCredentialSupport : CommandClassSupport, IActiveScheduleSupport
     {
         public const byte MIN_VERSION_FOR_ACTIVE_SCHEDULE_SUPPORT = 2;
+        public const byte MIN_VERSION_FOR_NUMBER_OF_CREDENTIAL_SLOTS_PER_USER = 2;
 
         private UserCredentialSupportData UserCredentialSupportData { get; set; }
         public override CommandClassSupportData CommandClassSupportData
@@ -374,7 +375,7 @@ namespace Zats.Services
 
         private byte[] PrepareCredentialCapabilitiesReport()
         {
-            var credentialCapReport = new COMMAND_CLASS_USER_CREDENTIAL.CREDENTIAL_CAPABILITIES_REPORT();
+            var credentialCapReport = new COMMAND_CLASS_USER_CREDENTIAL_V2.CREDENTIAL_CAPABILITIES_REPORT();
 
             credentialCapReport.properties1.credentialChecksumSupport = (byte)(UserCredentialSupportData.CredentialChecksumSupport ? 0x01 : 0x00);
             credentialCapReport.properties1.adminCodeSupport = (byte)(UserCredentialSupportData.AdminCodeSupport ? 0x01 : 0x00);
@@ -384,37 +385,44 @@ namespace Zats.Services
 
             foreach (SupportedCredentialType suppCredType in UserCredentialSupportData.SupportedCredentialTypes)
             {
-                var vg1 = new COMMAND_CLASS_USER_CREDENTIAL.CREDENTIAL_CAPABILITIES_REPORT.TVG1CREDENTIALTYPE();
+                var vg1 = new COMMAND_CLASS_USER_CREDENTIAL_V2.CREDENTIAL_CAPABILITIES_REPORT.TVG1CREDENTIALTYPE();
                 vg1.credentialType = (byte)suppCredType.Type;
                 credentialCapReport.vg1CredentialType.Add(vg1);
 
-                var vg2 = new COMMAND_CLASS_USER_CREDENTIAL.CREDENTIAL_CAPABILITIES_REPORT.TVG2PROPERTIES2PERCREDENTIALTYPE();
+                var vg2 = new COMMAND_CLASS_USER_CREDENTIAL_V2.CREDENTIAL_CAPABILITIES_REPORT.TVG2PROPERTIES2PERCREDENTIALTYPE();
                 vg2.properties1.clSupport = (byte)(suppCredType.CredentialLearnSupport ? 0x01 : 0x00);
                 credentialCapReport.vg2Properties2PerCredentialType.Add(vg2);
 
-                var vg3 = new COMMAND_CLASS_USER_CREDENTIAL.CREDENTIAL_CAPABILITIES_REPORT.TVG3NUMBEROFSUPPORTEDCREDENTIALSLOTSPERCREDENTIALTYPE();
+                var vg3 = new COMMAND_CLASS_USER_CREDENTIAL_V2.CREDENTIAL_CAPABILITIES_REPORT.TVG3NUMBEROFSUPPORTEDCREDENTIALSLOTSPERCREDENTIALTYPE();
                 vg3.numberOfSupportedCredentialSlots = Tools.GetBytes(suppCredType.NoOfSupportedSlots);
                 credentialCapReport.vg3NumberOfSupportedCredentialSlotsPerCredentialType.Add(vg3);
 
-                var vg4 = new COMMAND_CLASS_USER_CREDENTIAL.CREDENTIAL_CAPABILITIES_REPORT.TVG4MINLENGTHOFCREDENTIALDATAPERCREDENTIALTYPE();
+                var vg4 = new COMMAND_CLASS_USER_CREDENTIAL_V2.CREDENTIAL_CAPABILITIES_REPORT.TVG4MINLENGTHOFCREDENTIALDATAPERCREDENTIALTYPE();
                 vg4.minLengthOfCredentialData = suppCredType.MinCredentialDataLength;
                 credentialCapReport.vg4MinLengthOfCredentialDataPerCredentialType.Add(vg4);
 
-                var vg5 = new COMMAND_CLASS_USER_CREDENTIAL.CREDENTIAL_CAPABILITIES_REPORT.TVG5MAXLENGTHOFCREDENTIALDATAPERCREDENTIALTYPE();
+                var vg5 = new COMMAND_CLASS_USER_CREDENTIAL_V2.CREDENTIAL_CAPABILITIES_REPORT.TVG5MAXLENGTHOFCREDENTIALDATAPERCREDENTIALTYPE();
                 vg5.maxLengthOfCredentialData = suppCredType.MaxCredentialDataLength;
                 credentialCapReport.vg5MaxLengthOfCredentialDataPerCredentialType.Add(vg5);
 
-                var vg6 = new COMMAND_CLASS_USER_CREDENTIAL.CREDENTIAL_CAPABILITIES_REPORT.TVG6CLRECOMMENDEDTIMEOUTPERCREDENTIALTYPE();
+                var vg6 = new COMMAND_CLASS_USER_CREDENTIAL_V2.CREDENTIAL_CAPABILITIES_REPORT.TVG6CLRECOMMENDEDTIMEOUTPERCREDENTIALTYPE();
                 vg6.clRecommendedTimeout = suppCredType.CredentialLearnRecommendedTimeout;
                 credentialCapReport.vg6ClRecommendedTimeoutPerCredentialType.Add(vg6);
 
-                var vg7 = new COMMAND_CLASS_USER_CREDENTIAL.CREDENTIAL_CAPABILITIES_REPORT.TVG7CLNUMBEROFSTEPSPERCREDENTIALTYPE();
+                var vg7 = new COMMAND_CLASS_USER_CREDENTIAL_V2.CREDENTIAL_CAPABILITIES_REPORT.TVG7CLNUMBEROFSTEPSPERCREDENTIALTYPE();
                 vg7.clNumberOfSteps = suppCredType.CredentialLearnNoOfSteps;
                 credentialCapReport.vg7ClNumberOfStepsPerCredentialType.Add(vg7);
 
-                var vg8 = new COMMAND_CLASS_USER_CREDENTIAL.CREDENTIAL_CAPABILITIES_REPORT.TVG8MAXIMUMCREDENTIALHASHLENGTHPERCREDENTIALTYPE();
+                var vg8 = new COMMAND_CLASS_USER_CREDENTIAL_V2.CREDENTIAL_CAPABILITIES_REPORT.TVG8MAXIMUMCREDENTIALHASHLENGTHPERCREDENTIALTYPE();
                 vg8.maximumCredentialHashLength = suppCredType.MaxHCredentialHashLength;
                 credentialCapReport.vg8MaximumCredentialHashLengthPerCredentialType.Add(vg8);
+
+                if (Version >= MIN_VERSION_FOR_NUMBER_OF_CREDENTIAL_SLOTS_PER_USER)
+                {
+                    var vg9 = new COMMAND_CLASS_USER_CREDENTIAL_V2.CREDENTIAL_CAPABILITIES_REPORT.TVG9NUMBEROFCREDENTIALSLOTSPERUSER();
+                    vg9.numberOfCredentialSlotsPerUser = Tools.GetBytes(suppCredType.NoOfCredentialSlotsPerUser);
+                    credentialCapReport.vg9NumberOfCredentialSlotsPerUser.Add(vg9);
+                }
             }
 
             return credentialCapReport;
@@ -860,6 +868,12 @@ namespace Zats.Services
                 return SvResultNames.Failed;
             }
 
+            // CC:0083.02.04.11.004 - ignore the command if it exceeds the per-user slot limit of the credential type
+            if (IsPerUserCredentialLimitExceeded(newCredentialData.UserUniqeId, newCredentialData.Type, newCredentialData.SlotId))
+            {
+                return SvResultNames.Failed;
+            }
+
 
             if (newCredentialData.UserUniqeId == 0 || newCredentialData.UserUniqeId > UserCredentialSupportData.NoOfSupportedUsers)
             {
@@ -1100,6 +1114,32 @@ namespace Zats.Services
             return null;
         }
 
+        /// <summary>
+        /// Checks whether storing a credential at the given slot would give the user more credentials of this type than
+        /// the "Number of Credential Slots per User" limit allows. A limit of zero means "equal to the number of supported slots"
+        /// (CC:0083.02.04.11.003), which is already enforced by the type-wide slot checks.
+        /// </summary>
+        private bool IsPerUserCredentialLimitExceeded(ushort userUniqueId, CredentialType credentialType, ushort credentialSlot)
+        {
+            if (Version < MIN_VERSION_FOR_NUMBER_OF_CREDENTIAL_SLOTS_PER_USER)
+            {
+                return false;
+            }
+
+            var credentialTypeSettings = UserCredentialSupportData.SupportedCredentialTypes.FirstOrDefault(x => x.Type == credentialType);
+
+            if (credentialTypeSettings == null || credentialTypeSettings.NoOfCredentialSlotsPerUser == 0)
+            {
+                return false;
+            }
+
+            // A credential that already sits in this slot is replaced and does not count as an additional one.
+            int otherCredentials = UserCredentialSupportData.
+                UserCredentials.Count(x => x.UserUniqeId == userUniqueId && x.Type == credentialType && x.SlotId != credentialSlot);
+
+            return otherCredentials >= credentialTypeSettings.NoOfCredentialSlotsPerUser;
+        }
+
         private UserCredential GetNextUsersCredential(UserCredential currentCredential)
         {
             var credentialsList = UserCredentialSupportData.
@@ -1141,6 +1181,12 @@ namespace Zats.Services
 
             if (opType == CredentialLearnOperationType.CredentialLearnAdd && UserCredentialSupportData.
                 UserCredentials.FindAll(x => x.Type == credentialType).Count >= credentialTypeSettings.NoOfSupportedSlots)
+            {
+                return SvResultNames.Failed;
+            }
+
+            // CC:0083.02.04.11.004 - a learned credential counts against the per-user slot limit as well
+            if (opType == CredentialLearnOperationType.CredentialLearnAdd && IsPerUserCredentialLimitExceeded(userUniqueId, credentialType, credentialSlot))
             {
                 return SvResultNames.Failed;
             }
@@ -2749,6 +2795,7 @@ namespace Zats.Services
             supportedCredentialType.CredentialLearnRecommendedTimeout = 0;
             supportedCredentialType.CredentialLearnNoOfSteps = 0;
             supportedCredentialType.CredentialLearnSupport = false;
+            supportedCredentialType.NoOfCredentialSlotsPerUser = 0;
 
             return supportedCredentialType;
         }
@@ -3705,6 +3752,9 @@ namespace Zats.Services
         [CustomDataParameter(1, "Read Back (CRB)", CommandClassesImpl.UiControl.CheckBox, CommandClassesImpl.InputType.Boolean, EditType.Config | EditType.Edit)]
         public bool ReadBack { get; set; } = true;
 
+        [CustomDataParameter(2, "Number of Slots per User", CommandClassesImpl.UiControl.TextBox, CommandClassesImpl.InputType.UShort, EditType.Config | EditType.Edit)]
+        public ushort NoOfCredentialSlotsPerUser { get; set; } = 0;
+
         [JsonIgnore]
         public string Name
         {
@@ -3836,7 +3886,8 @@ namespace Zats.Services
 
     public enum KeyLockerEntryType
     {
-        LeafCompliantMifareRfidConfiguration = 0x01
+        [Description("0x01 LEAF-Compliant MIFARE Application Configuration")]
+        LeafCompliantMifareAppConfig = 0x01
     }
 
     public enum KeyLockerEntrySetOperationType
