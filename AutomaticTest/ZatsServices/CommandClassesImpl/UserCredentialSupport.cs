@@ -3033,7 +3033,7 @@ namespace Zats.Services
                     return null;
                 }
 
-                for (ushort id = 1; id < credentialTypeConfig.NoOfSupportedSlots; id++)
+                for (ushort id = 1; id <= credentialTypeConfig.NoOfSupportedSlots; id++)
                 {
                     if (existingCredentials.FirstOrDefault(x => x.SlotId == id) == null)
                     {
