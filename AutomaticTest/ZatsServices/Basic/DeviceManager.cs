@@ -897,36 +897,73 @@ namespace Zats.Services
 
         private void InitDevicesPassive(List<DeviceHostClient> availableDevices, List<UnknownDevice> requiredDevices, string configPath)
         {
-            var tempRemovedAvailableList = new ConcurrentBag<DeviceHostClient>();
-            var tempRemovedRequiredList = new ConcurrentBag<UnknownDevice>();
-            Parallel.ForEach(requiredDevices, requiredDev =>
+            // The library of a host is known once its version was read, and a requirement without alias and network state takes
+            // any free host of its library, so every host is filled first, and the requirements that name their host by alias or
+            // network state claim it before the others.
+            Parallel.ForEach(availableDevices, availableDev => FillDeviceHostClient(availableDev));
+
+            var matchedPairs = new List<Tuple<UnknownDevice, DeviceHostClient>>();
+            var freeDevices = availableDevices.ToList();
+            foreach (UnknownDevice requiredDev in requiredDevices.OrderBy(x => IsSpecificRequirement(x) ? 0 : 1))
             {
-                DeviceHostClient matchedAvailableDevice = availableDevices.FirstOrDefault(availableDev =>
+                DeviceHostClient matchedAvailableDevice = freeDevices.FirstOrDefault(availableDev =>
                     // Alias of available device must be present.
                     !string.IsNullOrEmpty(availableDev.Host.Alias) &&
+                    availableDev.Library != Libraries.NoLib &&
                     // Check required alias if specified, otherwise accept any.
                     (requiredDev.HasAlias == false ||
                     availableDev.Host.Alias.Equals(requiredDev.Alias, StringComparison.InvariantCulture)) &&
                     // Check required network state if specified, otherwise accept any.
-                    (requiredDev.NetworkState == NodeNetworkState.Undefined || requiredDev.NetworkState == availableDev.Host.NetworkState));
+                    (requiredDev.NetworkState == NodeNetworkState.Undefined || requiredDev.NetworkState == availableDev.Host.NetworkState) &&
+                    // A requirement that names no host takes a host of its library only.
+                    (IsSpecificRequirement(requiredDev) || IsRequiredLibrary(requiredDev, availableDev.Library)));
 
                 if (matchedAvailableDevice != null)
                 {
-                    FillDeviceHostClient(matchedAvailableDevice);
-                    if (matchedAvailableDevice.Library != Libraries.NoLib)
-                    {
-                        InitDeviceHostClient(matchedAvailableDevice);
-                        AddOrReplaceDevice(requiredDev.DeviceAlias, matchedAvailableDevice);
-                        tempRemovedRequiredList.Add(requiredDev);
-                        tempRemovedAvailableList.Add(matchedAvailableDevice);
-                        LoadConfigurationItem(matchedAvailableDevice, configPath);
-                        InitNodes(matchedAvailableDevice);
-                    }
+                    matchedPairs.Add(Tuple.Create(requiredDev, matchedAvailableDevice));
+                    freeDevices.Remove(matchedAvailableDevice);
                 }
+            }
+
+            Parallel.ForEach(matchedPairs, pair =>
+            {
+                InitDeviceHostClient(pair.Item2);
+                AddOrReplaceDevice(pair.Item1.DeviceAlias, pair.Item2);
+                LoadConfigurationItem(pair.Item2, configPath);
+                InitNodes(pair.Item2);
             });
+
             // update input arrays
-            availableDevices.RemoveAll(x => tempRemovedAvailableList.Contains(x));
-            requiredDevices.RemoveAll(x => tempRemovedRequiredList.Contains(x));
+            availableDevices.RemoveAll(x => matchedPairs.Any(pair => pair.Item2 == x));
+            requiredDevices.RemoveAll(x => matchedPairs.Any(pair => pair.Item1 == x));
+        }
+
+        /// <summary>
+        /// Whether the requirement names its host by alias or network state instead of taking any host of its library.
+        /// </summary>
+        private static bool IsSpecificRequirement(UnknownDevice requiredDevice)
+        {
+            return requiredDevice.HasAlias || requiredDevice.NetworkState != NodeNetworkState.Undefined;
+        }
+
+        /// <summary>
+        /// Whether the library of a host is one of the libraries the requirement accepts. A Serial API host matches any Serial
+        /// API library of its kind, controller or end device, as the firmware names of the libraries differ between generations.
+        /// </summary>
+        private static bool IsRequiredLibrary(UnknownDevice requiredDevice, Libraries library)
+        {
+            if (requiredDevice.Libraries == null)
+            {
+                return false;
+            }
+
+            if (requiredDevice.Libraries.Contains(library))
+            {
+                return true;
+            }
+
+            return IsSerialApi(library)
+                && requiredDevice.Libraries.Any(x => IsSerialApi(x) && IsSerialApiController(x) == IsSerialApiController(library));
         }
 
         internal bool Disconnect(DeviceHostClient deviceHostClient)
