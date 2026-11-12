@@ -2605,10 +2605,29 @@ namespace Zats.Services
             CurrentProfile.TempNetKey = tempNetKey;
         }
 
+        /// <summary>
+        /// Sets the role type of the device in its network view and, when the device supports the Z-Wave Plus Info Command
+        /// Class, in the Z-Wave Plus Info Report it answers with.
+        /// </summary>
         public void SetRoleType(Alias deviceNumber, RoleTypes roleType)
         {
             Device device = DeviceManager.GetDevice(deviceNumber);
             device.Network.SetRoleType((ZWave.Enums.RoleTypes)roleType);
+
+            ZWavePlusInfoSupport zwpInfoSupport = DeviceManager.GetCommandClassSupport<ZWavePlusInfoSupport>(deviceNumber);
+            if (zwpInfoSupport?.CommandClassSupportData is ZWavePlusInfoSupportData zwpInfoSupportData && zwpInfoSupportData.RoleType != roleType)
+            {
+                zwpInfoSupport.UpdateSupportData(new ZWavePlusInfoSupportData()
+                {
+                    ZWaveVersion = zwpInfoSupportData.ZWaveVersion,
+                    RoleType = roleType,
+                    V1NodeType = zwpInfoSupportData.V1NodeType,
+                    NodeType = zwpInfoSupportData.NodeType,
+                    InstallerIconType = zwpInfoSupportData.InstallerIconType,
+                    UserIconType = zwpInfoSupportData.UserIconType,
+                    LogLevel = zwpInfoSupportData.LogLevel
+                });
+            }
         }
 
         public Profile GetProfile()

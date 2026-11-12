@@ -137,6 +137,10 @@ namespace Zats.Services
         byte[] GetProfileNetworkKey(SecuritySchemes securityScheme);
         Dictionary<SecuritySchemes, byte[]> GetProfileNetworkKeys();
         Profile GetProfile();
+        /// <summary>
+        /// Sets the role type of the device in its network view and, when the device supports the Z-Wave Plus Info Command
+        /// Class, in the Z-Wave Plus Info Report it answers with.
+        /// </summary>
         void SetRoleType(Alias deviceNumber, RoleTypes roleType);
         BasicToken.Void AddMultiChannelSupport(Alias deviceNumber, byte[] EndPointCcs);
 

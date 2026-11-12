@@ -368,6 +368,20 @@ namespace Zats.Services
             }
         }
 
+        /// <summary>
+        /// Returns the running Command Class support of the given type on the given end point of the device, or null when the
+        /// device has none.
+        /// </summary>
+        public T GetCommandClassSupport<T>(Alias deviceNumber, byte endPoint = 0) where T : CommandClassSupport
+        {
+            Device device = GetDevice(deviceNumber);
+
+            return CCSupportContainers
+                .Where(x => x.Device == device && x.CommandClassSupport is T && x.CommandClassSupport.DstNode.EndPointId == endPoint)
+                .Select(x => (T)x.CommandClassSupport)
+                .FirstOrDefault();
+        }
+
         public void CancelAllRunningSupportCommands(Alias deviceNumber)
         {
             Device device = GetDevice(deviceNumber);
