@@ -30,10 +30,11 @@ namespace Zats.Services
             bool supervision, SecurityVersions securityVersions, IEnumerable<CommandClassSupport> commandClassSupportList, AssociationSupportData rootAssociationSupportData = null);
         /// <summary>
         /// Sets the device up as the ZATS device of a test case with the Command Class support the parameters select. Handles a
-        /// Controller Serial API and an End Device Serial API; each gets the device class, role type and icon of its kind, and the
-        /// keys of an End Device Serial API stay on the chip.
+        /// Controller Serial API and an End Device Serial API; each gets the device class, role type and icon of its kind unless
+        /// the caller chooses the role type, and the keys of an End Device Serial API stay on the chip.
         /// </summary>
-        TasksAccessPoint SetupControllerDeviceConfigured(Alias deviceNumber, bool multiChannel, bool supervision, bool crc16, SecurityVersions securityVersions, bool transportService, bool overwriteConfig = false);
+        TasksAccessPoint SetupControllerDeviceConfigured(Alias deviceNumber, bool multiChannel, bool supervision, bool crc16, SecurityVersions securityVersions,
+            bool transportService, bool overwriteConfig = false, RoleTypes? roleType = null);
         /// <summary>
         /// Sets the device up as the ZATS device of a test case with Multi Channel, Supervision, CRC-16, S0, S2 and Transport
         /// Service support, overwriting its configuration. Handles a Controller Serial API and an End Device Serial API.

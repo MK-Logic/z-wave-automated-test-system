@@ -796,11 +796,11 @@ namespace Zats.Services
 
         /// <summary>
         /// Sets the device up as the ZATS device of a test case with the Command Class support the parameters select. Handles a
-        /// Controller Serial API and an End Device Serial API; each gets the device class, role type and icon of its kind, and the
-        /// keys of an End Device Serial API stay on the chip.
+        /// Controller Serial API and an End Device Serial API; each gets the device class, role type and icon of its kind unless
+        /// the caller chooses the role type, and the keys of an End Device Serial API stay on the chip.
         /// </summary>
         public TasksAccessPoint SetupControllerDeviceConfigured(Alias deviceNumber, bool multiChannel, bool supervision, bool crc16, SecurityVersions securityVersions,
-            bool transportService, bool overwriteConfig = false)
+            bool transportService, bool overwriteConfig = false, RoleTypes? roleType = null)
         {
             Device controllerDevice = DeviceManager.GetDevice(deviceNumber);
             // An End Device Serial API in the network of the DUT, included by the DUT, keeps the end device identity the DUT
@@ -810,6 +810,9 @@ namespace Zats.Services
             {
                 DeviceManager.ConfigurationClear(deviceNumber);
             }
+
+            bool isNewSetup = overwriteConfig || DeviceManager.ConfigurationIsEmpty(deviceNumber);
+            RoleTypes deviceRoleType = roleType ?? GetSetupRoleType(deviceNumber, controllerDevice, isEndDevice, overwriteConfig, isNewSetup);
 
             // Prepare NIF
             var deviceOptions = DeviceOptions.Listening; // for CSC Role Type [RT:01.11.0004.1]
@@ -829,7 +832,7 @@ namespace Zats.Services
             byte[] iconType = isEndDevice ? new byte[] { 0x07, 0x00 } : new byte[] { 0x01, 0x00 };
             var zwpInfoSuppData = new ZWavePlusInfoSupportData()
             {
-                RoleType = isEndDevice ? RoleTypes.END_NODE_ALWAYS_ON : RoleTypes.CONTROLLER_CENTRAL_STATIC,
+                RoleType = deviceRoleType,
                 NodeType = NodeTypes.ZWAVEPLUS_NODE,
                 InstallerIconType = iconType,
                 UserIconType = iconType
@@ -848,7 +851,7 @@ namespace Zats.Services
             bool isVersionSuppSecure = true;
 
             // Setup Controller Device
-            if (overwriteConfig || DeviceManager.ConfigurationIsEmpty(deviceNumber))
+            if (isNewSetup)
             {
                 var supportedCCs = new List<CommandClassSupport>();
                 supportedCCs.AddRange(new CommandClassSupport[]
@@ -865,6 +868,7 @@ namespace Zats.Services
                 {
                     supportedCCs.Insert(supportedCCs.Count - 1, fakeInclCtrlSupp);
                 }
+
                 if (multiChannel)
                 {
                     supportedCCs.Add(mcaSupp);
@@ -881,7 +885,7 @@ namespace Zats.Services
                     transportService,
                     supportedCCs);
 
-                controllerDevice.Network.SetRoleType(isEndDevice ? ZWave.Enums.RoleTypes.END_NODE_ALWAYS_ON : ZWave.Enums.RoleTypes.CONTROLLER_CENTRAL_STATIC);
+                controllerDevice.Network.SetRoleType((ZWave.Enums.RoleTypes)deviceRoleType);
                 controllerDevice.Network.SetNodeType(ZWave.Enums.NodeTypes.ZWAVEPLUS_NODE);
             }
             else
@@ -958,6 +962,50 @@ namespace Zats.Services
             }
             DeviceManager.ConfigurationUpdate(deviceNumber);
             return new TasksAccessPoint(controllerDevice);
+        }
+
+        /// <summary>
+        /// Role type the setup gives a device when the caller chooses none: Always On End Node for an End Device Serial API, the
+        /// role type of its place in the network for a controller.
+        /// </summary>
+        private RoleTypes GetSetupRoleType(Alias deviceNumber, Device device, bool isEndDevice, bool overwriteConfig, bool isNewSetup)
+        {
+            if (isEndDevice)
+            {
+                return RoleTypes.END_NODE_ALWAYS_ON;
+            }
+
+            return GetControllerSetupRoleType(deviceNumber, device as Controller, overwriteConfig, isNewSetup);
+        }
+
+        /// <summary>
+        /// Role type the setup gives a controller when the caller chooses none. The first rule that applies wins.
+        /// a) Central Static Controller when the caller overwrites the configuration, because the caller resets the controller
+        /// afterwards to start a network.
+        /// b) The role type of its saved configuration when it has one.
+        /// c) Central Static Controller when its Serial API reports it as real primary.
+        /// d) Sub Static Controller otherwise, so that a DUT without SIS does not hand the SIS role to the ZATS controller.
+        /// </summary>
+        private RoleTypes GetControllerSetupRoleType(Alias deviceNumber, Controller controller, bool overwriteConfig, bool isNewSetup)
+        {
+            if (overwriteConfig)
+            {
+                return RoleTypes.CONTROLLER_CENTRAL_STATIC;
+            }
+
+            if (!isNewSetup)
+            {
+                return (RoleTypes)DeviceManager.GetConfiguration(deviceNumber).Network.GetRoleType();
+            }
+
+            bool isRealPrimary = false;
+            if (controller != null)
+            {
+                GetControllerCapabilitiesResult capabilities = controller.GetControllerCapabilities();
+                isRealPrimary = capabilities && (capabilities.ControllerCapability & (byte)ControllerCapabilities.IS_REAL_PRIMARY) != 0;
+            }
+
+            return isRealPrimary ? RoleTypes.CONTROLLER_CENTRAL_STATIC : RoleTypes.CONTROLLER_SUB_STATIC;
         }
 
         /// <summary>
