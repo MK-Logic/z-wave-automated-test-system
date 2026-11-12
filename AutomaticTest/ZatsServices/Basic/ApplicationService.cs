@@ -794,10 +794,18 @@ namespace Zats.Services
             AddOrModifySecurityConfigured(deviceNumber, securityVersions, null, false, supportedCC);
         }
 
+        /// <summary>
+        /// Sets the device up as the ZATS device of a test case with the Command Class support the parameters select. Handles a
+        /// Controller Serial API and an End Device Serial API; each gets the device class, role type and icon of its kind, and the
+        /// keys of an End Device Serial API stay on the chip.
+        /// </summary>
         public TasksAccessPoint SetupControllerDeviceConfigured(Alias deviceNumber, bool multiChannel, bool supervision, bool crc16, SecurityVersions securityVersions,
             bool transportService, bool overwriteConfig = false)
         {
             Device controllerDevice = DeviceManager.GetDevice(deviceNumber);
+            // An End Device Serial API in the network of the DUT, included by the DUT, keeps the end device identity the DUT
+            // interviewed: Binary Switch, Always On End Node, and no Inclusion Controller Command Class.
+            bool isEndDevice = controllerDevice.Library.IsSerialApiEndDevice();
             if (overwriteConfig)
             {
                 DeviceManager.ConfigurationClear(deviceNumber);
@@ -806,7 +814,7 @@ namespace Zats.Services
             // Prepare NIF
             var deviceOptions = DeviceOptions.Listening; // for CSC Role Type [RT:01.11.0004.1]
             // Generic Controller DT (ZWPv2) [DT:32.11.0001.1]
-            byte genericType = (byte)GenericTypes.GENERIC_CONTROLLER;
+            byte genericType = (byte)(isEndDevice ? GenericTypes.SWITCH_BINARY : GenericTypes.GENERIC_CONTROLLER);
             byte specificType = SpecificTypes.NOT_USED;
 
             // Prepare CC Support Data
@@ -818,12 +826,13 @@ namespace Zats.Services
                         new byte[] { COMMAND_CLASS_DEVICE_RESET_LOCALLY.ID, COMMAND_CLASS_DEVICE_RESET_LOCALLY.DEVICE_RESET_LOCALLY_NOTIFICATION.ID }),
                     },
             };
+            byte[] iconType = isEndDevice ? new byte[] { 0x07, 0x00 } : new byte[] { 0x01, 0x00 };
             var zwpInfoSuppData = new ZWavePlusInfoSupportData()
             {
-                RoleType = RoleTypes.CONTROLLER_CENTRAL_STATIC,
+                RoleType = isEndDevice ? RoleTypes.END_NODE_ALWAYS_ON : RoleTypes.CONTROLLER_CENTRAL_STATIC,
                 NodeType = NodeTypes.ZWAVEPLUS_NODE,
-                InstallerIconType = new byte[] { 0x01, 0x00 },
-                UserIconType = new byte[] { 0x01, 0x00 }
+                InstallerIconType = iconType,
+                UserIconType = iconType
             };
 
             // Prepare Supported CCs
@@ -850,9 +859,12 @@ namespace Zats.Services
                     //basicSupp, // Do not add Basic CC. [DT:32.11.0004.1]
                     deviceResetLocallySupp,
                     manSpecSupp,
-                    fakeInclCtrlSupp,
                     new VersionSupport(supportedCCs)                        { Version = versionSuppVersion, Secure = isVersionSuppSecure },
                 });
+                if (!isEndDevice)
+                {
+                    supportedCCs.Insert(supportedCCs.Count - 1, fakeInclCtrlSupp);
+                }
                 if (multiChannel)
                 {
                     supportedCCs.Add(mcaSupp);
@@ -869,7 +881,7 @@ namespace Zats.Services
                     transportService,
                     supportedCCs);
 
-                controllerDevice.Network.SetRoleType(ZWave.Enums.RoleTypes.CONTROLLER_CENTRAL_STATIC);
+                controllerDevice.Network.SetRoleType(isEndDevice ? ZWave.Enums.RoleTypes.END_NODE_ALWAYS_ON : ZWave.Enums.RoleTypes.CONTROLLER_CENTRAL_STATIC);
                 controllerDevice.Network.SetNodeType(ZWave.Enums.NodeTypes.ZWAVEPLUS_NODE);
             }
             else
@@ -948,6 +960,10 @@ namespace Zats.Services
             return new TasksAccessPoint(controllerDevice);
         }
 
+        /// <summary>
+        /// Sets the device up as the ZATS device of a test case with Multi Channel, Supervision, CRC-16, S0, S2 and Transport
+        /// Service support, overwriting its configuration. Handles a Controller Serial API and an End Device Serial API.
+        /// </summary>
         public TasksAccessPoint SetupControllerDeviceConfigured(Alias deviceNumber)
         {
             return SetupControllerDeviceConfigured(deviceNumber, true, true, true, SecurityVersions.S0 | SecurityVersions.S2, true);
@@ -956,11 +972,19 @@ namespace Zats.Services
 
         private readonly TransmitOptions TX_OPTIONS = TransmitOptions.Ack | TransmitOptions.AutoRoute | TransmitOptions.Explore;
 
+        /// <summary>
+        /// Sets the device up as the ZATS device of a test case and waits for a sleeping DUT to wake up. Handles a Controller
+        /// Serial API and an End Device Serial API.
+        /// </summary>
         public TasksAccessPoint SetupControllerDeviceConfiguredAndWaitForDut(Alias deviceNumber, Node dutNode, RoleTypes dutRoleType)
         {
             return SetupControllerDeviceConfiguredAndWaitForDut(deviceNumber, dutNode, dutRoleType, null);
         }
 
+        /// <summary>
+        /// Sets the device up as the ZATS device of a test case with the given initial S2 sequence number and waits for a sleeping
+        /// DUT to wake up. Handles a Controller Serial API and an End Device Serial API.
+        /// </summary>
         public TasksAccessPoint SetupControllerDeviceConfiguredAndWaitForDut(Alias deviceNumber, Node dutNode, RoleTypes dutRoleType, byte? initS2SequenceNumber)
         {
             SendDataResult resNop = null;
@@ -1219,6 +1243,37 @@ namespace Zats.Services
 
             device.Network.SetCommandClasses(newCmdClasses.ToArray());
             device.Network.SetCommandClassesSecureVirtual(newCmdClasses.ToArray());
+
+            if (device.Library.IsSerialApiEndDevice())
+            {
+                // The End Device Serial API bootstraps itself with the keys it requests, so the enabled Security Classes of the
+                // view are its requested keys: The ones a test case chose, or all, within the Security versions of this setup.
+                // The chip gets them, and the keys it holds stay the granted ones of the view.
+                var requestedKeys = new List<ZWave.Enums.SecuritySchemes>();
+                if (securityVersions.HasFlag(SecurityVersions.S0) && device.Network.IsEnabledS0)
+                {
+                    requestedKeys.Add(ZWave.Enums.SecuritySchemes.S0);
+                }
+                if (securityVersions.HasFlag(SecurityVersions.S2))
+                {
+                    if (device.Network.IsEnabledS2_UNAUTHENTICATED)
+                    {
+                        requestedKeys.Add(ZWave.Enums.SecuritySchemes.S2_UNAUTHENTICATED);
+                    }
+                    if (device.Network.IsEnabledS2_AUTHENTICATED)
+                    {
+                        requestedKeys.Add(ZWave.Enums.SecuritySchemes.S2_AUTHENTICATED);
+                    }
+                    if (device.Network.IsEnabledS2_ACCESS)
+                    {
+                        requestedKeys.Add(ZWave.Enums.SecuritySchemes.S2_ACCESS);
+                    }
+                }
+
+                DeviceManager.SetSecurityInclusionRequestedKeys(device, requestedKeys.ToArray());
+                DeviceManager.ConfigurationUpdate(deviceNumber);
+                return;
+            }
 
             device.Network.IsEnabledS0 = false;
             device.Network.IsEnabledS2_UNAUTHENTICATED = false;

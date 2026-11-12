@@ -2281,6 +2281,25 @@ namespace Zats.Services
         }
 
         /// <summary>
+        /// Sets the keys an End Device Serial API requests in its S2 bootstrapping, on the chip and as the enabled Security
+        /// Classes of the view, which decide whether the device is an Access Control end device. The keys the chip holds stay
+        /// the granted ones of the view. The view is unchanged when the chip refuses the keys.
+        /// </summary>
+        internal ReturnValueResult SetSecurityInclusionRequestedKeys(Device device, ZWave.Enums.SecuritySchemes[] securitySchemes)
+        {
+            ReturnValueResult result = device.SetSecurityInclusionRequestedKeys(securitySchemes);
+            if (result)
+            {
+                device.Network.IsEnabledS0 = securitySchemes.Contains(ZWave.Enums.SecuritySchemes.S0);
+                device.Network.IsEnabledS2_UNAUTHENTICATED = securitySchemes.Contains(ZWave.Enums.SecuritySchemes.S2_UNAUTHENTICATED);
+                device.Network.IsEnabledS2_AUTHENTICATED = securitySchemes.Contains(ZWave.Enums.SecuritySchemes.S2_AUTHENTICATED);
+                device.Network.IsEnabledS2_ACCESS = securitySchemes.Contains(ZWave.Enums.SecuritySchemes.S2_ACCESS);
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Sets the NIF inclusion state to <see cref="InclusionStates.NotIncluded"/> and writes the NIF, for a Learn Mode.
         /// </summary>
         internal void SetNodeInformationForLearnMode(Alias deviceAlias)
