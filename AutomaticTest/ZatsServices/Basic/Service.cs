@@ -1815,7 +1815,7 @@ namespace Zats.Services
         public BasicResult.ReturnValue SetSecurityInclusionRequestedKeys(Alias deviceNumber, SecuritySchemes[] securitySchemes)
         {
             Device device = DeviceManager.GetDevice(deviceNumber);
-            ReturnValueResult res = device.SetSecurityInclusionRequestedKeys((securitySchemes ?? new SecuritySchemes[0])
+            ReturnValueResult res = DeviceManager.SetSecurityInclusionRequestedKeys(device, (securitySchemes ?? new SecuritySchemes[0])
                 .Select(x => (ZWave.Enums.SecuritySchemes)x).ToArray());
             return new BasicActionResult.ReturnValue(res);
         }
