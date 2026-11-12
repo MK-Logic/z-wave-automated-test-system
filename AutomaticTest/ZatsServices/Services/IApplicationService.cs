@@ -136,6 +136,9 @@ namespace Zats.Services
         byte[] GetProfileNetworkKey(SecuritySchemes securityScheme);
         Dictionary<SecuritySchemes, byte[]> GetProfileNetworkKeys();
         Profile GetProfile();
+        /// <summary>
+        /// Sets the role type of the device.
+        /// </summary>
         void SetRoleType(Alias deviceNumber, RoleTypes roleType);
         BasicToken.Void AddMultiChannelSupport(Alias deviceNumber, byte[] EndPointCcs);
 
