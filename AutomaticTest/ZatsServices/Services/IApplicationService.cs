@@ -32,7 +32,8 @@ namespace Zats.Services
         /// Sets the device up as the ZATS device of a test case with the Command Class support the parameters select. Handles a
         /// Controller Serial API and an End Device Serial API.
         /// </summary>
-        TasksAccessPoint SetupControllerDeviceConfigured(Alias deviceNumber, bool multiChannel, bool supervision, bool crc16, SecurityVersions securityVersions, bool transportService, bool overwriteConfig = false);
+        TasksAccessPoint SetupControllerDeviceConfigured(Alias deviceNumber, bool multiChannel, bool supervision, bool crc16, SecurityVersions securityVersions,
+            bool transportService, bool overwriteConfig = false, RoleTypes? roleType = null);
         /// <summary>
         /// Sets the device up as the ZATS device of a test case with Multi Channel, Supervision, CRC-16, S0, S2 and Transport
         /// Service support, overwriting its configuration. Handles a Controller Serial API and an End Device Serial API.
