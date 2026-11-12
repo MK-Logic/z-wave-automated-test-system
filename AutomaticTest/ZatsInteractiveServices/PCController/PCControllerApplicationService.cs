@@ -810,7 +810,8 @@ namespace Zats.Services
             throw new NotImplementedException();
         }
 
-        public TasksAccessPoint SetupControllerDeviceConfigured(Alias deviceNumber, bool multiChannel, bool supervision, bool crc16, SecurityVersions securityVersions, bool transportService, bool overwriteConfig = false)
+        public TasksAccessPoint SetupControllerDeviceConfigured(Alias deviceNumber, bool multiChannel, bool supervision, bool crc16,
+            SecurityVersions securityVersions, bool transportService, bool overwriteConfig = false, RoleTypes? roleType = null)
         {
             throw new NotImplementedException();
         }
