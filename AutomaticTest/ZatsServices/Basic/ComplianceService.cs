@@ -67,9 +67,22 @@ namespace Zats.Services
             return new BasicActionResult.SetSucNodeId(res);
         }
 
+        /// <summary>
+        /// Sends the command with the encapsulations of the send settings. An End Device Serial API that is the ZATS device of a
+        /// test case sends a singlecast at the highest Security Class its chip holds.
+        /// </summary>
         public BasicResult.SendData SendData(Alias senderNumber, Node receiverNode, byte[] cmdData, TransmitOptions txOptions)
         {
             Device sender = DeviceManager.GetDevice(senderNumber);
+
+            if (!SendDataSettings.GetForceMultiCast(senderNumber))
+            {
+                ZWave.Enums.SecuritySchemes? defaultScheme = GetDefaultSecurityScheme(senderNumber, sender, cmdData);
+                if (defaultScheme != null)
+                {
+                    return SendDataEx(senderNumber, receiverNode, cmdData, txOptions, TX_SEC_OPTIONS, (SecuritySchemes)defaultScheme.Value);
+                }
+            }
 
             var data = cmdData;
             data = ApplySupervisionMultiChannelAndCRC16SettingsToEncapData(senderNumber, data);
@@ -91,6 +104,96 @@ namespace Zats.Services
             {
                 var result = sender.SendData(receiverNode, data, (ZWave.Enums.TransmitOptions)txOptions, substituteSettings);
                 return new BasicActionResult.SendData(result);
+            }
+        }
+
+        /// <summary>
+        /// The Security Class at which the sender sends the given command when the caller names none, or null when the command
+        /// goes out as the caller built it. A command that belongs outside the Security encapsulation gets no Security Class.
+        /// </summary>
+        private ZWave.Enums.SecuritySchemes? GetDefaultSecurityScheme(Alias senderNumber, Device sender, byte[] data)
+        {
+            if (data == null || data.Length == 0 || IsOutsideSecurityEncapsulation(data))
+            {
+                return null;
+            }
+
+            ZWave.Enums.SecuritySchemes[] schemes = DeviceManager.GetDefaultSecuritySchemes(senderNumber, sender);
+
+            return schemes.Length > 0 ? schemes[0] : (ZWave.Enums.SecuritySchemes?)null;
+        }
+
+        /// <summary>
+        /// Whether the command belongs outside the Security encapsulation: A NOP or a Z-Wave Long Range NOP, or a command the
+        /// encapsulation order puts outside [CC:0000.00.00.11.021], which is a command of the Security, Security 2, Transport
+        /// Service or CRC-16 Encapsulation Command Class or the Wake On Critical Message Notify Command.
+        /// </summary>
+        private static bool IsOutsideSecurityEncapsulation(byte[] data)
+        {
+            switch (data[0])
+            {
+                case COMMAND_CLASS_ZWAVE_LONG_RANGE.ID:
+                    return data.Length > 1 && data[1] == COMMAND_CLASS_ZWAVE_LONG_RANGE.ZWAVE_LR_CMD_NO_OPERATION.ID;
+                case COMMAND_CLASS_NO_OPERATION.ID:
+                case COMMAND_CLASS_SECURITY.ID:
+                case COMMAND_CLASS_SECURITY_2.ID:
+                case COMMAND_CLASS_TRANSPORT_SERVICE_V2.ID:
+                case COMMAND_CLASS_CRC_16_ENCAP.ID:
+                    return true;
+                case COMMAND_CLASS_WAKE_ON_CRITICAL_MESSAGE.ID:
+                    return data.Length > 1 && data[1] == COMMAND_CLASS_WAKE_ON_CRITICAL_MESSAGE.WAKE_ON_CRITICAL_MESSAGE_NOTIFY.ID;
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Asks the node for its Commands Supported Report at the given Security Classes, highest first, and stores the classes
+        /// the node answered at and the Command Classes of the report at the highest of them in the given result. An S2 class is
+        /// asked only when the NIF of the result lists the Security 2 Command Class, S0 only when it lists the Security Command
+        /// Class. The result is unchanged when the node answers at none.
+        /// </summary>
+        private void RequestSecureCommandClasses(Device device, NodeTag node, RequestNodeInfoResult nodeInfo, ZWave.Enums.SecuritySchemes[] schemes)
+        {
+            byte[] nifCommandClasses = nodeInfo.CommandClasses ?? new byte[0];
+            var answeredSchemes = new List<ZWave.Enums.SecuritySchemes>();
+            foreach (ZWave.Enums.SecuritySchemes scheme in schemes)
+            {
+                bool isS0 = scheme == ZWave.Enums.SecuritySchemes.S0;
+                if (!nifCommandClasses.Contains(isS0 ? COMMAND_CLASS_SECURITY.ID : COMMAND_CLASS_SECURITY_2.ID))
+                {
+                    continue;
+                }
+
+                byte[] commandsSupportedGet = isS0
+                    ? (byte[])new COMMAND_CLASS_SECURITY.SECURITY_COMMANDS_SUPPORTED_GET()
+                    : (byte[])new COMMAND_CLASS_SECURITY_2.SECURITY_2_COMMANDS_SUPPORTED_GET();
+                byte[] commandsSupportedReport = isS0
+                    ? new byte[] { COMMAND_CLASS_SECURITY.ID, COMMAND_CLASS_SECURITY.SECURITY_COMMANDS_SUPPORTED_REPORT.ID }
+                    : new byte[] { COMMAND_CLASS_SECURITY_2.ID, COMMAND_CLASS_SECURITY_2.SECURITY_2_COMMANDS_SUPPORTED_REPORT.ID };
+
+                RequestDataResult report = device.RequestDataEx(node, commandsSupportedGet, (ZWave.Enums.TransmitOptions)TX_OPTIONS,
+                    (ZWave.Enums.TransmitSecurityOptions)TX_SEC_OPTIONS, scheme, ZWave.Enums.TransmitOptions2.NONE, commandsSupportedReport,
+                    device.Network.RequestTimeoutMs);
+                if (!report || report.Command == null || report.Command.Length < 2)
+                {
+                    continue;
+                }
+
+                if (answeredSchemes.Count == 0)
+                {
+                    IEnumerable<byte> commandClasses = isS0
+                        ? ((COMMAND_CLASS_SECURITY.SECURITY_COMMANDS_SUPPORTED_REPORT)report.Command).commandClassSupport
+                        : ((COMMAND_CLASS_SECURITY_2.SECURITY_2_COMMANDS_SUPPORTED_REPORT)report.Command).commandClass;
+                    nodeInfo.SecureCommandClasses = (commandClasses ?? new byte[0]).TakeWhile(x => x != 0xEF).ToArray();
+                }
+
+                answeredSchemes.Add(scheme);
+            }
+
+            if (answeredSchemes.Count > 0)
+            {
+                nodeInfo.SecuritySchemes = answeredSchemes.ToArray();
             }
         }
 
@@ -428,9 +531,21 @@ namespace Zats.Services
             return RequestData(senderNumber, receiverNode, data, TX_OPTIONS, expectedData, timeoutMs);
         }
 
+        /// <summary>
+        /// Sends the command with the encapsulations of the send settings and waits for the expected command. An End Device Serial
+        /// API that is the ZATS device of a test case sends at the highest Security Class its chip holds.
+        /// </summary>
         public BasicResult.RequestData RequestData(Alias senderNumber, Node receiverNode, byte[] sendData, TransmitOptions txOptions, byte[] expectedData, int timeoutMs)
         {
             Device sender = DeviceManager.GetDevice(senderNumber);
+
+            ZWave.Enums.SecuritySchemes? defaultScheme = GetDefaultSecurityScheme(senderNumber, sender, sendData);
+            if (defaultScheme != null)
+            {
+                return RequestDataEx(senderNumber, receiverNode, sendData, txOptions, TX_SEC_OPTIONS, (SecuritySchemes)defaultScheme.Value,
+                    TransmitOptions2.NONE, expectedData, timeoutMs);
+            }
+
             var data = sendData;
             data = ApplySupervisionSettingsToEncapData(senderNumber, data);
 
@@ -472,10 +587,23 @@ namespace Zats.Services
             return new BasicActionResult.RequestData(res);
         }
 
+        /// <summary>
+        /// Requests the NIF of the node. An End Device Serial API that is the ZATS device of a test case also asks the node for its
+        /// Commands Supported Report at every Security Class its chip holds and the NIF lists the Command Class of.
+        /// </summary>
         public BasicResult.RequestNodeInfo RequestNodeInfo(Alias deviceNumber, Node node)
         {
             Device device = DeviceManager.GetDevice(deviceNumber);
             RequestNodeInfoResult res = device.RequestNodeInfo(node);
+            if (res)
+            {
+                ZWave.Enums.SecuritySchemes[] defaultSchemes = DeviceManager.GetDefaultSecuritySchemes(deviceNumber, device);
+                if (defaultSchemes.Length > 0)
+                {
+                    RequestSecureCommandClasses(device, node, res, defaultSchemes);
+                }
+            }
+
             return new BasicActionResult.RequestNodeInfo(res);
         }
 

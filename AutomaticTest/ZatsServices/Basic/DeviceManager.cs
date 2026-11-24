@@ -2381,6 +2381,40 @@ namespace Zats.Services
             return result;
         }
 
+        private readonly ConcurrentDictionary<Device, bool> _defaultSecurityDevices = new ConcurrentDictionary<Device, bool>();
+
+        /// <summary>
+        /// Lets the given End Device Serial API send the commands that name no Security Class at its highest granted one, see
+        /// <see cref="GetDefaultSecuritySchemes"/>.
+        /// </summary>
+        internal void EnableDefaultSecurity(Device device)
+        {
+            _defaultSecurityDevices[device] = true;
+        }
+
+        /// <summary>
+        /// The Security Classes at which the device sends a command that names none, highest first: The keys the chip of an End
+        /// Device Serial API holds, when <see cref="EnableDefaultSecurity"/> was called for the device and its send settings do
+        /// not deny security. Empty for every other device, whose commands go out as the caller built them, and for a device
+        /// without keys.
+        /// </summary>
+        internal ZWave.Enums.SecuritySchemes[] GetDefaultSecuritySchemes(Alias deviceNumber, Device device)
+        {
+            if (!_defaultSecurityDevices.ContainsKey(device) || SendDataSettings.GetSecure(deviceNumber) == false)
+            {
+                return new ZWave.Enums.SecuritySchemes[0];
+            }
+
+            // The chip holds the keys and the enabled Security Classes of the view are the requested ones, so the chip is asked.
+            GetSecurityKeysResult securityKeys = device.GetSecurityKeys();
+            if (!securityKeys || securityKeys.SecuritySchemes == null)
+            {
+                return new ZWave.Enums.SecuritySchemes[0];
+            }
+
+            return ZWave.Enums.SecuritySchemeSet.ALL.Where(x => securityKeys.SecuritySchemes.Contains(x)).ToArray();
+        }
+
         /// <summary>
         /// Sets the NIF inclusion state to <see cref="InclusionStates.NotIncluded"/> and writes the NIF, for a Learn Mode.
         /// </summary>

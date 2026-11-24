@@ -954,6 +954,14 @@ namespace Zats.Services
                         configuration);
                 }
             }
+
+            if (isEndDevice)
+            {
+                // No host SecurityManager encapsulates the commands of an End Device Serial API, so the services send the ones
+                // that name no Security Class at the highest class the chip holds.
+                DeviceManager.EnableDefaultSecurity(controllerDevice);
+            }
+
             DeviceManager.ConfigurationUpdate(deviceNumber);
             return new TasksAccessPoint(controllerDevice);
         }
