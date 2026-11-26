@@ -7,10 +7,13 @@ namespace Zats.Services
     {
         void SetCRC16(Alias controllerNumber, bool enabled);
         /// <summary>
-        /// Wraps sent frames in a Wake On Critical Message Notify Command.
-        /// Requires IApplicationService.AddWakeOnCriticalMessage, which also sets the severity.
+        /// Wraps all frames sent by the device in a Wake On Critical Message Notify Command with the given severity,
+        /// or sends them without it if the severity is null (default).
+        /// 0 and values above 7 are sent as given (masked to 3 bits) to allow negative testing.
+        /// On End Device libraries only non-secure frames are supported, and an S2 Message Encapsulation with a
+        /// SPAN Extension is always sent without a Notify Command (see WakeOnCriticalMessageManager).
         /// </summary>
-        void SetWakeOnCriticalMessage(Alias deviceNumber, bool enabled);
+        void SetWakeOnCriticalMessageSeverity(Alias deviceNumber, byte? severity);
         void SetSupressMulticastFollowUp(Alias controllerNumber, bool enabled);
         void SetForceMultiCast(Alias controllerNumber, bool enabled);
         void SetSkipWaitingSendCallback(Alias controllerNumber, bool enabled);
@@ -30,7 +33,7 @@ namespace Zats.Services
         void SetRequestTimeoutMs(Alias controllerNumber, int value);
 
         bool GetCRC16(Alias controllerNumber);
-        bool GetWakeOnCriticalMessage(Alias deviceNumber);
+        byte? GetWakeOnCriticalMessageSeverity(Alias deviceNumber);
         bool GetSupressMulticastFollowUp(Alias controllerNumber);
         bool GetForceMultiCast(Alias controllerNumber);
         bool GetSkipWaitingSendCallback(Alias controllerNumber);

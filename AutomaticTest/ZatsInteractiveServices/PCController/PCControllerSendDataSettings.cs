@@ -17,7 +17,7 @@ namespace Zats.Services
             cmdClassesView.NavigateTo(PCControllerIdMap.CommandClassesView.CRC16Chk).SetCheckBoxStateAt(true);
         }
 
-        public void SetWakeOnCriticalMessage(Alias deviceNumber, bool enabled)
+        public void SetWakeOnCriticalMessageSeverity(Alias deviceNumber, byte? severity)
         {
             // Wake On Critical Message is not supported by the PC Controller yet.
             throw new System.NotImplementedException();
@@ -205,7 +205,7 @@ namespace Zats.Services
             throw new System.NotImplementedException();
         }
 
-        public bool GetWakeOnCriticalMessage(Alias deviceNumber)
+        public byte? GetWakeOnCriticalMessageSeverity(Alias deviceNumber)
         {
             // Wake On Critical Message is not supported by the PC Controller yet.
             throw new System.NotImplementedException();

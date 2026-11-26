@@ -17,7 +17,6 @@ namespace Zats.Services
         BasicToken.Void AddBasicEx(Alias deviceNumber);
         BasicToken.Void AddBasicEx(Alias deviceNumber, SecuritySchemes scheme);
         void AddCrc16(Alias deviceNumber);
-        void AddWakeOnCriticalMessage(Alias deviceNumber, byte severity);
         void AddMultiChannel(Alias deviceNumber);
         void AddManufacturerSpecific(Alias deviceNumber, ushort manufacturerId, ushort productId, ushort productTypeId);
         void AddManufacturerSpecific_V2(Alias deviceNumber, ushort manufacturerId, ushort productId, ushort productTypeId, byte deviceIdType, byte deviceIdDataFormat, byte[] deviceId);
@@ -72,6 +71,7 @@ namespace Zats.Services
         void ResetSecurity(Alias deviceNumber);
         void ResumeSecurity(Alias deviceNumber);
         void ResumeTransportService(Alias deviceNumber, int maxFragmentSize);
+        void ResumeWakeOnCriticalMessage(Alias deviceNumber);
         ISecurityTestSettings SecurityTestSettings { get; }
         IProvisioningService Provisioning { get; }
         IAssociations Associations { get; }
@@ -102,6 +102,12 @@ namespace Zats.Services
         BasicResult.Test StopTrafficTest(Alias deviceNumber, Node node);
         void SuspendSecurity(Alias deviceNumber);
         void SuspendTransportService(Alias deviceNumber);
+        /// <summary>
+        /// Disables the Wake On Critical Message manager, which every device has by default, in both directions:
+        /// received Notify Commands reach the application unchanged (not decapsulated), and the severity of
+        /// outgoing frames is ignored. ResumeWakeOnCriticalMessage enables it again.
+        /// </summary>
+        void SuspendWakeOnCriticalMessage(Alias deviceNumber);
         ITransportServiceTestSettings TransportServiceTestSettings { get; set; }
         void EnableNetworkKey(Alias deviceNumber, SecuritySchemes securityScheme, bool isEnable);
         void EnableCSA(Alias deviceNumber, bool isEnable);

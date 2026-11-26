@@ -181,11 +181,8 @@ namespace Zats.Services
                 substituteFlags = (bool)SendDataSettings.GetSecure(senderNumber) ?
                     ZWave.Enums.SubstituteFlags.UseSecurity : ZWave.Enums.SubstituteFlags.DenySecurity;
             }
-            if (SendDataSettings.GetWakeOnCriticalMessage(senderNumber))
-            {
-                substituteFlags |= ZWave.Enums.SubstituteFlags.UseWakeOnCriticalMessage;
-            }
             var substituteSettings = new SubstituteSettings();
+            substituteSettings.WakeOnCriticalMessageSeverity = SendDataSettings.GetWakeOnCriticalMessageSeverity(senderNumber);
             substituteSettings.S0MaxBytesPerFrameSize = SendDataSettings.GetMaxBytesPerFrameSize(senderNumber);
             substituteSettings.SubstituteFlags = substituteFlags;
             substituteSettings.IsSkipWaitingSendCallbackEnabled = SendDataSettings.GetSkipWaitingSendCallback(senderNumber);

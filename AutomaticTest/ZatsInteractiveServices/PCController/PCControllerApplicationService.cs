@@ -265,7 +265,13 @@ namespace Zats.Services
             }
         }
 
-        public void AddWakeOnCriticalMessage(Alias deviceNumber, byte severity)
+        public void SuspendWakeOnCriticalMessage(Alias deviceNumber)
+        {
+            // Wake On Critical Message is not supported by the PC Controller yet.
+            throw new NotImplementedException();
+        }
+
+        public void ResumeWakeOnCriticalMessage(Alias deviceNumber)
         {
             // Wake On Critical Message is not supported by the PC Controller yet.
             throw new NotImplementedException();

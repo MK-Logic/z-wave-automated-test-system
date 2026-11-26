@@ -1857,6 +1857,10 @@ namespace Zats.Services
 
             var cmdClasses = new byte[] { COMMAND_CLASS_BASIC.ID };
             client.SessionClient.AddSubstituteManager(new SettingsSubstituteManager(client.Network));
+            // Every device decapsulates received Wake On Critical Message Notify Commands and wraps frames sent with
+            // a severity (SendDataSettings.SetWakeOnCriticalMessageSeverity, SubstituteSettings.WakeOnCriticalMessageSeverity).
+            // ApplicationService.SuspendWakeOnCriticalMessage disables it.
+            client.SessionClient.AddSubstituteManager(new WakeOnCriticalMessageManager(client.Network));
             var deviceOption = ZWave.Enums.DeviceOptions.Listening;
             var genericType = (byte)GenericTypes.STATIC_CONTROLLER;
             var specificType = SpecificTypes.PC_CONTROLLER;
