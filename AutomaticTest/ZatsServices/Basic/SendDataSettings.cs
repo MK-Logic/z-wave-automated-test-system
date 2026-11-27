@@ -46,6 +46,11 @@ namespace Zats.Services
             GetItem(controllerNumber).IsCRC16Enabled = enabled;
         }
 
+        public void SetWakeOnCriticalMessage(Alias deviceNumber, bool enabled)
+        {
+            GetItem(deviceNumber).IsWakeOnCriticalMessageEnabled = enabled;
+        }
+
         public void SetDstEndPoint(Alias controllerNumber, byte enabled)
         {
             GetItem(controllerNumber).DstEndPoint = enabled;
@@ -143,6 +148,11 @@ namespace Zats.Services
         public bool GetCRC16(Alias controllerNumber)
         {
             return GetItem(controllerNumber).IsCRC16Enabled;
+        }
+
+        public bool GetWakeOnCriticalMessage(Alias deviceNumber)
+        {
+            return GetItem(deviceNumber).IsWakeOnCriticalMessageEnabled;
         }
 
         public bool GetSupressMulticastFollowUp(Alias controllerNumber)

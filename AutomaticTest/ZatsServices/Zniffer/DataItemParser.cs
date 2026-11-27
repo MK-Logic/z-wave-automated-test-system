@@ -14,6 +14,8 @@ namespace Zats.Services
         public void Parse(DataItem dataItem)
         {
             ParseTransportService(dataItem);
+            // The Wake On Critical Message Notify Command is outside of S2, so remove it before parsing security.
+            WakeOnCriticalMessageParser.Parse(dataItem);
             SecurityManager.ParseSecurity(dataItem);
         }
 

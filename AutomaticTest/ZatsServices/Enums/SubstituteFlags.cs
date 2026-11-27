@@ -44,5 +44,8 @@ namespace Zats.Services
         Crc16Encap = 0x00000010,
         Multicast = 0x00000020,
         SecurityFailed = 0x00000040,
+        MultiChannel = 0x00000080,
+        Settings = 0x00000100,
+        WakeOnCriticalMessage = 0x00000200,
     }
 }

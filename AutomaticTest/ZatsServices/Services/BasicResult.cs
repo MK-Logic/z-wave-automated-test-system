@@ -79,6 +79,14 @@ namespace Zats.Services
             public SecuritySchemes SecurityScheme { get; protected set; }
             public SubstitutionInfo RxSubstituteInfo { get; set; }
             public List<ExtenssionInfo> Extensions { get; set; }
+            /// <summary>
+            /// Encapsulations removed from the received command (e.g. Security, Supervision, WakeOnCriticalMessage).
+            /// </summary>
+            public SubstituteIncomingFlags SubstituteIncomingFlags { get; protected set; }
+            /// <summary>
+            /// Severity of the Wake On Critical Message Notify Command the command was received in, or null.
+            /// </summary>
+            public byte? WakeOnCriticalMessageSeverity { get; protected set; }
         }
 
         public class ListenControllerUpdate : _ActionResult
@@ -851,6 +859,7 @@ namespace Zats.Services
             Rssi = achData.Rssi;
             SecurityScheme = (SecuritySchemes)achData.SecurityScheme;
             SubstituteIncomingFlags = (SubstituteIncomingFlags)achData.SubstituteIncomingFlags;
+            WakeOnCriticalMessageSeverity = achData.WakeOnCriticalMessageSeverity;
             TimeStamp = achData.TimeStamp;
         }
 
@@ -862,6 +871,10 @@ namespace Zats.Services
         public sbyte Rssi { get; }
         public SecuritySchemes SecurityScheme { get; }
         public SubstituteIncomingFlags SubstituteIncomingFlags { get; }
+        /// <summary>
+        /// Severity of the Wake On Critical Message Notify Command the command was received in, or null.
+        /// </summary>
+        public byte? WakeOnCriticalMessageSeverity { get; }
         public DateTime TimeStamp { get; }
     }
 

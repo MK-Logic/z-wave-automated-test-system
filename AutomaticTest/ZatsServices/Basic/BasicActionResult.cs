@@ -237,6 +237,8 @@ namespace Zats.Services
                 Rssi = value.Rssi;
                 SecurityScheme = (SecuritySchemes)value.SecurityScheme;
                 RxSubstituteInfo = new SubstitutionInfo() { SubstituteStatus = (SubstituteStatuses)value.SubstituteStatus };
+                SubstituteIncomingFlags = (SubstituteIncomingFlags)value.SubstituteIncomingFlags;
+                WakeOnCriticalMessageSeverity = value.WakeOnCriticalMessageSeverity;
                 if (value.Extensions != null)
                 {
                     Extensions = value.Extensions.ExtensionsList.

@@ -1084,6 +1084,21 @@ namespace Zats.Services
             device.SessionClient.AddSubstituteManager(crc16);
         }
 
+        /// <summary>
+        /// Adds Wake On Critical Message support: incoming Notify Commands are decapsulated, and frames sent with
+        /// SubstituteFlags.UseWakeOnCriticalMessage are wrapped in a Notify Command with the given severity.
+        /// Calling it again replaces the manager, e.g. to change the severity.
+        /// On End Device libraries only non-secure frames are supported.
+        /// </summary>
+        /// <param name="deviceNumber">device alias</param>
+        /// <param name="severity">severity (1..7) of outgoing Notify Commands; other values are sent as given for negative testing</param>
+        public void AddWakeOnCriticalMessage(Alias deviceNumber, byte severity)
+        {
+            Device device = DeviceManager.GetDevice(deviceNumber);
+            var wakeOnCriticalMessage = new WakeOnCriticalMessageManager(device.Network) { Severity = severity };
+            device.SessionClient.AddSubstituteManager(wakeOnCriticalMessage);
+        }
+
         public ApplicationToken.Supervision AddSupervision(Alias deviceNumber)
         {
             ApplicationToken.Supervision ret = null;

@@ -17,6 +17,12 @@ namespace Zats.Services
             cmdClassesView.NavigateTo(PCControllerIdMap.CommandClassesView.CRC16Chk).SetCheckBoxStateAt(true);
         }
 
+        public void SetWakeOnCriticalMessage(Alias deviceNumber, bool enabled)
+        {
+            // Wake On Critical Message is not supported by the PC Controller yet.
+            throw new System.NotImplementedException();
+        }
+
         public void SetSupressMulticastFollowUp(Alias controllerNumber, bool enabled)
         {
             var uiController = PCControllerDeviceManager.GetUIInstance(controllerNumber);
@@ -196,6 +202,12 @@ namespace Zats.Services
 
         public bool GetCRC16(Alias controllerNumber)
         {
+            throw new System.NotImplementedException();
+        }
+
+        public bool GetWakeOnCriticalMessage(Alias deviceNumber)
+        {
+            // Wake On Critical Message is not supported by the PC Controller yet.
             throw new System.NotImplementedException();
         }
 

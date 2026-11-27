@@ -17,6 +17,7 @@ namespace Zats.Services
         BasicToken.Void AddBasicEx(Alias deviceNumber);
         BasicToken.Void AddBasicEx(Alias deviceNumber, SecuritySchemes scheme);
         void AddCrc16(Alias deviceNumber);
+        void AddWakeOnCriticalMessage(Alias deviceNumber, byte severity);
         void AddMultiChannel(Alias deviceNumber);
         void AddManufacturerSpecific(Alias deviceNumber, ushort manufacturerId, ushort productId, ushort productTypeId);
         void AddManufacturerSpecific_V2(Alias deviceNumber, ushort manufacturerId, ushort productId, ushort productTypeId, byte deviceIdType, byte deviceIdDataFormat, byte[] deviceId);

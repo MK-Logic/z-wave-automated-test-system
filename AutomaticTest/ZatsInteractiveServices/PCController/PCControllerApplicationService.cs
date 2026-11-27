@@ -265,6 +265,12 @@ namespace Zats.Services
             }
         }
 
+        public void AddWakeOnCriticalMessage(Alias deviceNumber, byte severity)
+        {
+            // Wake On Critical Message is not supported by the PC Controller yet.
+            throw new NotImplementedException();
+        }
+
         public ApplicationToken.Supervision AddSupervision(Alias deviceNumber)
         {
             ApplicationToken.Supervision ret = new ApplicationToken.Supervision(null);

@@ -6,6 +6,11 @@ namespace Zats.Services
     public interface ISendDataSettings
     {
         void SetCRC16(Alias controllerNumber, bool enabled);
+        /// <summary>
+        /// Wraps sent frames in a Wake On Critical Message Notify Command.
+        /// Requires IApplicationService.AddWakeOnCriticalMessage, which also sets the severity.
+        /// </summary>
+        void SetWakeOnCriticalMessage(Alias deviceNumber, bool enabled);
         void SetSupressMulticastFollowUp(Alias controllerNumber, bool enabled);
         void SetForceMultiCast(Alias controllerNumber, bool enabled);
         void SetSkipWaitingSendCallback(Alias controllerNumber, bool enabled);
@@ -25,6 +30,7 @@ namespace Zats.Services
         void SetRequestTimeoutMs(Alias controllerNumber, int value);
 
         bool GetCRC16(Alias controllerNumber);
+        bool GetWakeOnCriticalMessage(Alias deviceNumber);
         bool GetSupressMulticastFollowUp(Alias controllerNumber);
         bool GetForceMultiCast(Alias controllerNumber);
         bool GetSkipWaitingSendCallback(Alias controllerNumber);
