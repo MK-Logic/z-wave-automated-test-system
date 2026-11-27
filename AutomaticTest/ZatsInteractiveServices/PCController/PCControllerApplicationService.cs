@@ -810,23 +810,23 @@ namespace Zats.Services
             throw new NotImplementedException();
         }
 
-        public TasksAccessPoint SetupControllerDeviceConfigured(Alias deviceNumber, bool multiChannel, bool supervision, bool crc16,
+        public TasksAccessPoint SetupDeviceConfigured(Alias deviceNumber, bool multiChannel, bool supervision, bool crc16,
             SecurityVersions securityVersions, bool transportService, bool overwriteConfig = false, RoleTypes? roleType = null)
         {
             throw new NotImplementedException();
         }
 
-        public TasksAccessPoint SetupControllerDeviceConfigured(Alias deviceNumber)
+        public TasksAccessPoint SetupDeviceConfigured(Alias deviceNumber)
         {
             throw new NotImplementedException();
         }
 
-        public TasksAccessPoint SetupControllerDeviceConfiguredAndWaitForDut(Alias deviceNumber, Node dutNodeId, RoleTypes roleType)
+        public TasksAccessPoint SetupDeviceConfiguredAndWaitForDut(Alias deviceNumber, Node dutNodeId, RoleTypes roleType)
         {
             throw new NotImplementedException();
         }
 
-        public TasksAccessPoint SetupControllerDeviceConfiguredAndWaitForDut(Alias deviceNumber, Node dutNodeId, RoleTypes roleType, byte? initS2SequenceNumber)
+        public TasksAccessPoint SetupDeviceConfiguredAndWaitForDut(Alias deviceNumber, Node dutNodeId, RoleTypes roleType, byte? initS2SequenceNumber)
         {
             throw new NotImplementedException();
         }

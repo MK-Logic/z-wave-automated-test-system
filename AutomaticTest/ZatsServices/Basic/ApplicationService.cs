@@ -793,7 +793,7 @@ namespace Zats.Services
         /// Controller Serial API and an End Device Serial API; each gets the device class, role type and icon of its kind unless
         /// the caller chooses the role type, and the keys of an End Device Serial API stay on the chip.
         /// </summary>
-        public TasksAccessPoint SetupControllerDeviceConfigured(Alias deviceNumber, bool multiChannel, bool supervision, bool crc16, SecurityVersions securityVersions,
+        public TasksAccessPoint SetupDeviceConfigured(Alias deviceNumber, bool multiChannel, bool supervision, bool crc16, SecurityVersions securityVersions,
             bool transportService, bool overwriteConfig = false, RoleTypes? roleType = null)
         {
             Device device = DeviceManager.GetDevice(deviceNumber);
@@ -1014,9 +1014,9 @@ namespace Zats.Services
         /// Sets the device up as the ZATS device of a test case with Multi Channel, Supervision, CRC-16, S0, S2 and Transport
         /// Service support, overwriting its configuration. Handles a Controller Serial API and an End Device Serial API.
         /// </summary>
-        public TasksAccessPoint SetupControllerDeviceConfigured(Alias deviceNumber)
+        public TasksAccessPoint SetupDeviceConfigured(Alias deviceNumber)
         {
-            return SetupControllerDeviceConfigured(deviceNumber, true, true, true, SecurityVersions.S0 | SecurityVersions.S2, true);
+            return SetupDeviceConfigured(deviceNumber, true, true, true, SecurityVersions.S0 | SecurityVersions.S2, true);
         }
 
 
@@ -1026,16 +1026,16 @@ namespace Zats.Services
         /// Sets the device up as the ZATS device of a test case and waits for a sleeping DUT to wake up. Handles a Controller
         /// Serial API and an End Device Serial API.
         /// </summary>
-        public TasksAccessPoint SetupControllerDeviceConfiguredAndWaitForDut(Alias deviceNumber, Node dutNode, RoleTypes dutRoleType)
+        public TasksAccessPoint SetupDeviceConfiguredAndWaitForDut(Alias deviceNumber, Node dutNode, RoleTypes dutRoleType)
         {
-            return SetupControllerDeviceConfiguredAndWaitForDut(deviceNumber, dutNode, dutRoleType, null);
+            return SetupDeviceConfiguredAndWaitForDut(deviceNumber, dutNode, dutRoleType, null);
         }
 
         /// <summary>
         /// Sets the device up as the ZATS device of a test case with the given initial S2 sequence number and waits for a sleeping
         /// DUT to wake up. Handles a Controller Serial API and an End Device Serial API.
         /// </summary>
-        public TasksAccessPoint SetupControllerDeviceConfiguredAndWaitForDut(Alias deviceNumber, Node dutNode, RoleTypes dutRoleType, byte? initS2SequenceNumber)
+        public TasksAccessPoint SetupDeviceConfiguredAndWaitForDut(Alias deviceNumber, Node dutNode, RoleTypes dutRoleType, byte? initS2SequenceNumber)
         {
             SendDataResult resNop = null;
             Device sender = DeviceManager.GetDevice(deviceNumber);
@@ -1058,11 +1058,11 @@ namespace Zats.Services
 
             if (dutHasSleepingRoleType)
             {
-                // Sending the NOP before SetupControllerDeviceConfigured() keeps sleeping devices awake most of the times
+                // Sending the NOP before SetupDeviceConfigured() keeps sleeping devices awake most of the times
                 resNop = sender.SendDataEx(dutNode, nop, (ZWave.Enums.TransmitOptions)TX_OPTIONS, ZWave.Enums.SecuritySchemes.NONE);
             }
 
-            var ret = SetupControllerDeviceConfigured(deviceNumber, true, true, true, SecurityVersions.S0 | SecurityVersions.S2, true);
+            var ret = SetupDeviceConfigured(deviceNumber, true, true, true, SecurityVersions.S0 | SecurityVersions.S2, true);
             SecurityTestSettings.SetInitialS2SequenceNumber(deviceNumber, initS2SequenceNumber);
 
             if (dutHasSleepingRoleType)
