@@ -796,17 +796,17 @@ namespace Zats.Services
         public TasksAccessPoint SetupControllerDeviceConfigured(Alias deviceNumber, bool multiChannel, bool supervision, bool crc16, SecurityVersions securityVersions,
             bool transportService, bool overwriteConfig = false, RoleTypes? roleType = null)
         {
-            Device controllerDevice = DeviceManager.GetDevice(deviceNumber);
+            Device device = DeviceManager.GetDevice(deviceNumber);
             // An End Device Serial API in the network of the DUT, included by the DUT, keeps the end device identity the DUT
             // interviewed: Binary Switch, Always On End Node, and no Inclusion Controller Command Class.
-            bool isEndDevice = controllerDevice.Library.IsSerialApiEndDevice();
+            bool isEndDevice = device.Library.IsSerialApiEndDevice();
             if (overwriteConfig)
             {
                 DeviceManager.ConfigurationClear(deviceNumber);
             }
 
             bool isNewSetup = overwriteConfig || DeviceManager.ConfigurationIsEmpty(deviceNumber);
-            RoleTypes deviceRoleType = roleType ?? GetSetupRoleType(deviceNumber, controllerDevice, isEndDevice, overwriteConfig, isNewSetup);
+            RoleTypes deviceRoleType = roleType ?? GetSetupRoleType(deviceNumber, device, isEndDevice, overwriteConfig, isNewSetup);
 
             // Prepare NIF
             var deviceOptions = DeviceOptions.Listening; // for CSC Role Type [RT:01.11.0004.1]
@@ -844,7 +844,7 @@ namespace Zats.Services
             byte versionSuppVersion = 3;
             bool isVersionSuppSecure = true;
 
-            // Setup Controller Device
+            // Setup Device
             if (isNewSetup)
             {
                 var supportedCCs = new List<CommandClassSupport>();
@@ -879,8 +879,8 @@ namespace Zats.Services
                     transportService,
                     supportedCCs);
 
-                controllerDevice.Network.SetRoleType((ZWave.Enums.RoleTypes)deviceRoleType);
-                controllerDevice.Network.SetNodeType(ZWave.Enums.NodeTypes.ZWAVEPLUS_NODE);
+                device.Network.SetRoleType((ZWave.Enums.RoleTypes)deviceRoleType);
+                device.Network.SetNodeType(ZWave.Enums.NodeTypes.ZWAVEPLUS_NODE);
             }
             else
             {
@@ -959,11 +959,11 @@ namespace Zats.Services
             {
                 // No host SecurityManager encapsulates the commands of an End Device Serial API, so the services send the ones
                 // that name no Security Class at the highest class the chip holds.
-                DeviceManager.EnableDefaultSecurity(controllerDevice);
+                DeviceManager.EnableDefaultSecurity(device);
             }
 
             DeviceManager.ConfigurationUpdate(deviceNumber);
-            return new TasksAccessPoint(controllerDevice);
+            return new TasksAccessPoint(device);
         }
 
         /// <summary>
