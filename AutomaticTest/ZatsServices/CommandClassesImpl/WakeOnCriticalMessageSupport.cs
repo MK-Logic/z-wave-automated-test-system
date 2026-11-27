@@ -17,7 +17,7 @@ namespace Zats.Services
     /// Each controlling node configures the maximum severity of the Notify Commands it accepts
     /// (CC:008D.01.01.11.002). The maximum severity is stored per controlling node (CC:008D.01.01.11.003),
     /// 0 by default (CC:008D.01.01.11.004), and erased by <see cref="ResetEmulation"/> on exclusion
-    /// (CC:008D.01.00.21.00A).
+    /// (CC:008D.01.00.21.00A). The host calls it: the EDE on reset and after an exclusion, a CTT test case itself.
     ///
     /// Configuration Set is ignored (Supervision status FAIL) if
     /// - it is received via multicast addressing (CC:008D.01.01.11.008),
@@ -82,15 +82,23 @@ namespace Zats.Services
         ///   message clamped to the maximum severity of the destination (CC:008D.01.04.11.003).
         /// - A destination without a configured maximum severity gets no Notify Command (CC:008D.01.04.11.001), but the
         ///   message without it, or nothing if WakeOnCriticalMessageSupportData.SkipUnconfiguredDestinations is set.
+        /// - If S0 is the highest granted Security Class, no destination gets a Notify Command (CC:008D.01.00.21.006).
         /// The Supervision Get is built here with the Session ID counter of the device; the Supervision manager of the
         /// device is required to process the Supervision Report. Sent at the highest granted Security Class.
+        ///
+        /// Errors of the caller (arguments, device set-up) are thrown. The network state (device not included,
+        /// no Lifeline destination) is a normal situation for an operator of the EDE: it returns false and is logged
+        /// to the host (SupportDelegates.LogMessage) and always to the test report. A host UI must check the
+        /// arguments before calling, as the exceptions are not caught on the way from the UI to the support.
         /// </summary>
-        /// <param name="command">critical message, e.g. a Notification Report (max. 39 bytes incl. encapsulation, CC:008D.01.00.21.004)</param>
+        /// <param name="command">critical message, e.g. a Notification Report: max. 35 bytes, or 23 bytes with S2,
+        /// since the Notify Command must not carry a payload longer than 39 bytes (CC:008D.01.00.21.004, CC:008D.01.04.11.005)</param>
         /// <param name="severity">severity of the message itself (1..7), before clamping</param>
-        /// <returns>true if the message was sent to all destinations it is meant for, false if sending failed for any of them</returns>
+        /// <returns>true if the message was sent to all destinations it is meant for; false if the device is not included,
+        /// has no Lifeline destination, or sending failed for any destination</returns>
         /// <exception cref="ArgumentOutOfRangeException">severity not in range 1..7</exception>
-        /// <exception cref="ArgumentException">command shorter than 2 bytes</exception>
-        /// <exception cref="InvalidOperationException">supporting device not set up, not included, or without Supervision/Settings manager</exception>
+        /// <exception cref="ArgumentException">command shorter than 2 bytes, or too long for a Notify Command</exception>
+        /// <exception cref="InvalidOperationException">supporting device not set up, or without Supervision/Settings manager</exception>
         public bool SendCriticalMessage(byte[] command, byte severity)
         {
             if (severity < MIN_SEVERITY || severity > MAX_SEVERITY)
@@ -103,10 +111,9 @@ namespace Zats.Services
             {
                 throw new ArgumentException("The critical message must contain at least Command Class and Command.", nameof(command));
             }
-            // Setup errors of the test case: thrown, so that false only means that sending failed.
-            if (ReportDevice == null || _network.NodeTag == NodeTag.Empty)
+            if (ReportDevice == null)
             {
-                throw new InvalidOperationException("Critical message not sent: the supporting device is not set up or not included.");
+                throw new InvalidOperationException("Critical message not sent: the supporting device is not set up.");
             }
             // The Supervision manager does not encapsulate (it only wraps multicast follow-ups), but it is needed to
             // process the Supervision Report the destination sends back.
@@ -120,9 +127,35 @@ namespace Zats.Services
                 throw new InvalidOperationException("Critical message not sent: the supporting device has no Settings manager (no Supervision Session ID available).");
             }
 
-            bool ret = true;
             ZWave.Enums.SecuritySchemes scheme = ReportDevice.Network.GetHighestSecurityScheme();
-            foreach (NodeIdEx destination in GetLifelineNodes())
+            // Checked before the network state; the limit depends on the highest granted Security Class,
+            // so a message that only fits non-securely is rejected only after a secure inclusion.
+            int maxCommandLength = GetMaxCommandLength(scheme);
+            if (command.Length > maxCommandLength)
+            {
+                throw new ArgumentException($"The critical message is {command.Length} bytes long, but max. {maxCommandLength} bytes fit " +
+                    $"into a Notify Command with {scheme} (CC:008D.01.00.21.004, CC:008D.01.04.11.005).", nameof(command));
+            }
+
+            if (_network.NodeTag == NodeTag.Empty)
+            {
+                LogToHost(LogLevel.Error, "Critical message not sent: the device is not included");
+                return false;
+            }
+            List<NodeIdEx> destinations = GetLifelineNodes().ToList();
+            if (destinations.Count == 0)
+            {
+                LogToHost(LogLevel.Error, "Critical message not sent: no Lifeline destination configured");
+                return false;
+            }
+            bool isS0 = scheme == ZWave.Enums.SecuritySchemes.S0;
+            if (isS0)
+            {
+                LogToHost(LogLevel.Info, "Critical message sent without Notify Command: S0 is the highest granted Security Class (CC:008D.01.00.21.006)");
+            }
+
+            bool ret = true;
+            foreach (NodeIdEx destination in destinations)
             {
                 byte maxSeverity = GetMaxSeverity(destination.NodeId);
                 if (maxSeverity == 0 && WakeOnCriticalMessageSupportData.SkipUnconfiguredDestinations)
@@ -142,7 +175,7 @@ namespace Zats.Services
                 };
 
                 var substituteSettings = new SubstituteSettings(ZWave.Enums.SubstituteFlags.None, 0);
-                if (maxSeverity > 0)
+                if (maxSeverity > 0 && !isS0)
                 {
                     substituteSettings.WakeOnCriticalMessageSeverity = Math.Min(severity, maxSeverity);
                 }
@@ -151,13 +184,45 @@ namespace Zats.Services
                 var result = ReportDevice.SendDataEx(destinationNode, supervisionGet, TxOptions, substituteSettings, TxSecOptions, scheme, TxOptions2);
                 bool isSent = result != null && result.State == ActionStates.Completed;
                 ret &= isSent;
-                LogInfo($"Critical message to Node {destination.NodeId} in a Supervision Get (Session ID {sessionId}) " +
-                    (maxSeverity > 0
-                        ? $"in a Notify Command with Severity {substituteSettings.WakeOnCriticalMessageSeverity} (maximum severity {maxSeverity})"
-                        : "without Notify Command (no maximum severity configured)") +
-                    (isSent ? " sent" : " failed!"));
+                string notifyText = substituteSettings.WakeOnCriticalMessageSeverity != null
+                    ? $"in a Notify Command with Severity {substituteSettings.WakeOnCriticalMessageSeverity} (maximum severity {maxSeverity})"
+                    : isS0
+                        ? $"without Notify Command (S0, maximum severity {maxSeverity})"
+                        : "without Notify Command (no maximum severity configured)";
+                string message = $"Critical message to Node {destination.NodeId} in a Supervision Get (Session ID {sessionId}) {notifyText}";
+                if (isSent)
+                {
+                    LogInfo(message + " sent");
+                }
+                else
+                {
+                    LogToHost(LogLevel.Error, message + " failed!");
+                }
             }
             return ret;
+        }
+
+        /// <summary>
+        /// Maximum length of the critical message, so that the payload of the Notify Command does not exceed 39 bytes
+        /// (CC:008D.01.00.21.004): Supervision Get header (4 bytes) and, with S2, the S2 Message Encapsulation header
+        /// (4 bytes) and MAC (8 bytes). The S2 Message Encapsulation in a Notify Command carries no extension: no SPAN
+        /// (CC:008D.01.04.11.013) and no MPAN, since the Notify Command is singlecast only. With S0 no Notify Command
+        /// is sent (CC:008D.01.00.21.006), so the limit does not apply.
+        /// </summary>
+        private static int GetMaxCommandLength(ZWave.Enums.SecuritySchemes scheme)
+        {
+            const int MAX_NOTIFY_PAYLOAD_LENGTH = 39;
+            const int SUPERVISION_GET_HEADER_LENGTH = 4;
+            const int S2_OVERHEAD_LENGTH = 4 + 8;
+            switch (scheme)
+            {
+                case ZWave.Enums.SecuritySchemes.NONE:
+                    return MAX_NOTIFY_PAYLOAD_LENGTH - SUPERVISION_GET_HEADER_LENGTH;
+                case ZWave.Enums.SecuritySchemes.S0:
+                    return byte.MaxValue;
+                default:
+                    return MAX_NOTIFY_PAYLOAD_LENGTH - SUPERVISION_GET_HEADER_LENGTH - S2_OVERHEAD_LENGTH;
+            }
         }
 
         /// <summary>
@@ -176,6 +241,10 @@ namespace Zats.Services
             }
         }
 
+        /// <summary>
+        /// Erases the maximum severities (CC:008D.01.00.21.00A). Not called by the support itself: the EDE calls it
+        /// on reset and after an exclusion (EmulatorUtils), a CTT test case has to call it after excluding the device.
+        /// </summary>
         public override void ResetEmulation()
         {
             lock (_maxSeveritiesLock)
@@ -189,7 +258,8 @@ namespace Zats.Services
         {
             ou.SetNextActionItems();
 
-            // Only the Root Device supports the Command Class: the Notify Command must not be encapsulated (CC:008D.01.00.21.003).
+            // Only the Root Device supports the Command Class (design decision of this emulation): the maximum severity
+            // is stored per node, and Notify Commands are sent by the node, not by an End Point.
             if (EndPoint != 0 || !MatchesDestinationEndPoint())
             {
                 return;
@@ -307,10 +377,20 @@ namespace Zats.Services
             }
         }
 
-        // Logged into the test report like the other supports, only if WakeOnCriticalMessageSupportData.LogLevel > 0.
+        // Logged into the test report (CTT) or the backend console (EDE) like the other supports,
+        // only if WakeOnCriticalMessageSupportData.LogLevel > 0.
         private void LogInfo(string message)
         {
             CommandClassSupportUtils.ReportAddLog(WakeOnCriticalMessageSupportData.LogLevel, "{0} CC @ {1}: {2}",
+                CommandClassShortName, EndPointName, message);
+        }
+
+        // For situations the user must see: logged to the frontend of the host (SupportDelegates.LogMessage, wired by
+        // the EDE only) and always into the test report or backend console, regardless of the log level.
+        private void LogToHost(LogLevel level, string message)
+        {
+            SupportDelegates?.LogMessage?.Invoke(LogLocation.Frontend, level, $"{CommandClassShortName} CC: {message}");
+            CommandClassSupportUtils.ReportAddLog(Math.Max(WakeOnCriticalMessageSupportData.LogLevel, 1), "{0} CC @ {1}: {2}",
                 CommandClassShortName, EndPointName, message);
         }
     }
