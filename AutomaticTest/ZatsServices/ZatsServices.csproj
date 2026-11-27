@@ -140,6 +140,7 @@
     <Compile Include="CommandClassesImpl\ThermostatSetpointSupport.cs" />
     <Compile Include="CommandClassesImpl\TimeSupport.cs" />
     <Compile Include="CommandClassesImpl\UserCredentialSupport.cs" />
+    <Compile Include="CommandClassesImpl\WakeOnCriticalMessageSupport.cs" />
     <Compile Include="CommandClassesImpl\WakeUpSupport.cs" />
     <Compile Include="CommandClassesImpl\ManufacturerSpecificSupport.cs" />
     <Compile Include="CommandClassesImpl\WindowCoveringSupport.cs" />
